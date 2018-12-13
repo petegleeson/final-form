@@ -1182,4 +1182,36 @@ describe('Field.validation', () => {
     expect(spy.mock.calls[4][0].validating).toBe(false)
     expect(foo).toHaveBeenCalledTimes(1) // error was not resolved
   })
+
+  it('should only show most recent validation result', async () => {
+    const form = createForm({ onSubmit: onSubmitMock })
+
+    const usernameUpdate = jest.fn()
+    form.registerField(
+      'username',
+      usernameUpdate,
+      { error: true, invalid: true },
+      {
+        getValidator: () => value => {
+          if (!value) {
+            return undefined
+          } else if (value.length < 3) {
+            return 'too short'
+          }
+          return sleep(1).then(() => 'username is taken')
+        }
+      }
+    )
+
+    // causes async validation request
+    form.change('username', 'bob jones')
+    expect(usernameUpdate.mock.calls[0][0].error).toBeFalsy()
+    // causes sync validation check
+    form.change('username', 'bo')
+    expect(usernameUpdate.mock.calls[1][0].error).toBe('too short')
+    // async validation response
+    await sleep(2)
+    // should ignore stale response
+    expect(usernameUpdate).toHaveBeenCalledTimes(2)
+  })
 })
